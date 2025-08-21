@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     justifyContent: 'space-between',
     minHeight: 0,
-    overflow: 'auto',
+    overflow: 'scroll',
   },
   stepContentMobileTemplates: {
     padding: 16,

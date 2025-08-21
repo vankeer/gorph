@@ -140,7 +140,7 @@ export const APIKeyConfig: React.FC<APIKeyConfigProps> = ({ visible, onClose }) 
     } catch (error) {
       setTestResult({ 
         success: false, 
-        message: `Connection failed: ${error.message}` 
+        message: `Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
       });
     } finally {
       setIsTesting(false);

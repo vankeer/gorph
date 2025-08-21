@@ -40,7 +40,7 @@ export class LLMService {
       }
     } catch (error) {
       console.error('LLM API Error:', error);
-      throw new Error(`Failed to generate YAML: ${error.message}`);
+      throw new Error(`Failed to generate YAML: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

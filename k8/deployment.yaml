@@ -22,11 +22,10 @@ spec:
     spec:
       containers:
       - name: gorph-frontend
-        image: registry.digitalocean.com/resourceloop/gorph-frontend:latest
+        image: registry.digitalocean.com/resourceloop/gorph-frontend:v1.0.1
         ports:
         - containerPort: 80
           name: http
-
         resources:
           requests:
             memory: "128Mi"
@@ -47,4 +46,4 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 5
       imagePullSecrets:
-      - name: do-registry-secret 
+      - name: umi-backend 

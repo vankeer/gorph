@@ -1,0 +1,61 @@
+Trade off analysis:
+
+LLM-generated report: provide Gemini with a function to query the graph
+
+Good:
+- Balanced approach where you can deterministically get data since the data is somewhat enforced by the fucntion and since it is executed by the LLM, the LLM can use its own context/prompt to make the judgement if its appropriate to do this. 
+
+Bad:
+- LLM calls are expensive (money and latency)
+- The function might not be enough to solve the users use case requiring many looping calls.   
+
+
+Reccomended for:
+- This is reccomended Medium complexity use cases where a report may require the LLM to look up multiple queries and aggregate the data togetehr in a straightforward way. Does not need immediate responses and there is medium tolerance for innacuracy.   
+
+Not reccomended for:
+- Exactly deterministic behavior
+- Disparate/unstructured data. 
+
+
+------
+
+
+
+
+LLM-generated report: provide all the required data in context, before calling Gemini
+
+Good
+- Most flexible approach where LLM may have the most info to produce novel results.   
+
+Bad:
+- High cost/ High Latency
+- LLMs can be overloaded with context and get less accurate with more data you give it in the context.    
+- Lowest developer visibility
+
+Reccomended for:
+- Unstructured data. 
+- Good for identifying complex trends accross a set of disparate data.  I.e find out which customers are going to stop usign our services based on a bunch of customer service chat information.  Good for heuristics and identifying patterns.  
+
+Not reccomended for:
+- Accuracy or deterministic behavior
+
+
+-----
+
+
+
+Code-generated report: build the report deterministically based on a hardcoded neo4j cypher
+
+
+- Good - Cheap, easy to understand, deterministic.  Developer visibility
+- Bad - No flexibility if it doesnt match exact parameters.   
+
+
+Reccomended for: 
+- KNowing the exact inputs/use case and expected output.   
+- High volume of requests 
+
+
+
+

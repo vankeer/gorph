@@ -10,7 +10,7 @@ GO_OUT_DIR=api/v1
 DOCKER_REGISTRY=registry.digitalocean.com
 DOCKER_REPOSITORY=resourceloop
 DOCKER_IMAGE=$(DOCKER_REGISTRY)/$(DOCKER_REPOSITORY)/gorph-frontend
-DOCKER_TAG=latest
+DOCKER_TAG=v1.0.1
 
 # Kubernetes configuration
 K8_NAMESPACE=gorph

@@ -539,7 +539,7 @@ export default function DiagramViewer({ svg, dotContent, yamlContent, style, onT
             style={styles.scrollView} 
             maximumZoomScale={3} 
             minimumZoomScale={0.3}
-            onWheel={handleWheel}
+            {...(Platform.OS === 'web' ? { onWheel: handleWheel } : {})}
           >
             <SvgRenderer svgContent={renderedSvg} zoom={zoom} />
           </ScrollView>

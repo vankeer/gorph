@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Dimensions, Platform, ScrollView, Animated, TouchableOpacity, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import analytics from './src/services/analytics';
 
 import Header from './src/components/Header';
 import Footer from './src/components/Footer';
@@ -53,6 +54,12 @@ function AppInner() {
   const { width } = Dimensions.get('window');
   const isMobile = width < 768;
   const [activeTab, setActiveTab] = useState<'yaml' | 'dot' | 'diagram' | 'builder'>(isMobile ? 'diagram' : 'builder');
+
+  // Track tab changes
+  const handleTabChange = (newTab: 'yaml' | 'dot' | 'diagram' | 'builder') => {
+    analytics.trackTabSwitch(activeTab, newTab);
+    setActiveTab(newTab);
+  };
   const [isLandscape, setIsLandscape] = useState(false);
   const [templates, setTemplates] = useState<Record<string, any>>({});
   const [showHistory, setShowHistory] = useState(false);
@@ -120,6 +127,12 @@ function AppInner() {
       onboardingNewDiagramRef.current = null;
     }
   }, [session.diagrams, session.activeDiagramId, activeDiagram?.name, switchToDiagram]);
+
+  // Initialize analytics
+  useEffect(() => {
+    analytics.initialize();
+    analytics.trackAppLaunch();
+  }, []);
 
   // Check for first-time user and initialize onboarding
   useEffect(() => {
@@ -544,6 +557,10 @@ connections:
     setYamlInput(template.yaml, 'template', `Template "${template.name}" applied`);
     setShowTemplateModal(false);
     
+    // Track template usage
+    analytics.trackTemplateUsed(template.name);
+    analytics.trackDiagramCreated('template', template.name);
+    
     // Switch to diagram tab to show the result
     setActiveTab('diagram');
   };
@@ -552,13 +569,18 @@ connections:
   const handleLLMYamlGenerated = (generatedYaml: string) => {
     console.log('🤖 LLM YAML generated, applying to diagram...');
     
+    // Track AI generation success
+    analytics.trackAIGeneration('Generated infrastructure', true);
+    
     // Force the update by directly calling updateYaml
     if (activeDiagram) {
       // Update existing diagram
       updateYaml(generatedYaml, 'template', 'Generated with AI');
+      analytics.trackDiagramCreated('ai');
     } else {
       // Create new diagram with AI content
       createNewDiagram('AI Generated Diagram', generatedYaml);
+      analytics.trackDiagramCreated('ai');
     }
     
     // Close modal and switch to diagram view
@@ -1069,7 +1091,7 @@ connections:
           />
         <Header 
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={handleTabChange}
           showTabs={true}
           onTemplatePress={() => {
             console.log('📋 Header onTemplatePress called in mobile mode');
@@ -1198,7 +1220,7 @@ connections:
       />
       <Header 
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         showTabs={false}
         onTemplatePress={() => setShowTemplateModal(true)}
         validationStates={validationStates}
