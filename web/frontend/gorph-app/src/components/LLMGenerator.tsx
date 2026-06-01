@@ -57,18 +57,22 @@ export const LLMGenerator: React.FC<LLMGeneratorProps> = ({ onYamlGenerated, onC
     const openaiKey = localStorage?.getItem('openai_api_key');
     const anthropicKey = localStorage?.getItem('anthropic_api_key');
     const geminiKey = localStorage?.getItem('gemini_api_key');
+    const customBaseUrl = localStorage?.getItem('custom_base_url');
     
-    setHasAPIKey(Boolean(openaiKey || anthropicKey || geminiKey));
+    // Custom endpoint only requires baseUrl (API key is optional)
+    setHasAPIKey(Boolean(openaiKey || anthropicKey || geminiKey || customBaseUrl));
   };
 
   const getCurrentProviderName = () => {
     const openaiKey = localStorage?.getItem('openai_api_key');
     const anthropicKey = localStorage?.getItem('anthropic_api_key');
     const geminiKey = localStorage?.getItem('gemini_api_key');
+    const customBaseUrl = localStorage?.getItem('custom_base_url');
     
     if (openaiKey) return 'OpenAI';
     if (anthropicKey) return 'Anthropic Claude';
     if (geminiKey) return 'Google Gemini';
+    if (customBaseUrl) return 'Custom Endpoint';
     return 'Unknown';
   };
 

@@ -1,7 +1,9 @@
 export interface LLMConfig {
-  provider: 'openai' | 'anthropic' | 'gemini';
+  provider: 'openai' | 'anthropic' | 'gemini' | 'custom';
   apiKey: string;
   model?: string;
+  baseUrl?: string;
+  maxTokens?: number;
 }
 
 export interface LLMResponse {
@@ -16,7 +18,17 @@ export interface LLMResponse {
 const DEFAULT_MODELS = {
   openai: 'gpt-4o-mini',
   anthropic: 'claude-3-haiku-20240307',
-  gemini: 'gemini-1.5-flash'
+  gemini: 'gemini-1.5-flash',
+  custom: ''
+};
+
+const YAML_SYSTEM_PROMPT = 'You are a specialist in converting natural language descriptions into valid YAML infrastructure diagrams. Always respond with only valid YAML, no explanations or markdown formatting.';
+
+const getCustomEndpointUrl = (baseUrl: string, path: 'chat/completions') => {
+  const normalized = baseUrl.trim().replace(/\/+$/, '');
+  if (normalized.endsWith(`/v1/${path}`)) return normalized;
+  if (normalized.endsWith('/v1')) return `${normalized}/${path}`;
+  return `${normalized}/v1/${path}`;
 };
 
 export class LLMService {
@@ -35,6 +47,8 @@ export class LLMService {
           return await this.callAnthropic(prompt);
         case 'gemini':
           return await this.callGemini(prompt);
+        case 'custom':
+          return await this.callCustom(prompt);
         default:
           throw new Error(`Unsupported provider: ${this.config.provider}`);
       }
@@ -56,15 +70,14 @@ export class LLMService {
         messages: [
           {
             role: 'system',
-            content: 'You are a specialist in converting natural language descriptions into valid YAML infrastructure diagrams. Always respond with only valid YAML, no explanations or markdown formatting.'
+            content: YAML_SYSTEM_PROMPT
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        temperature: 0.3,
-        max_tokens: 2000
+        temperature: 0.3
       })
     });
 
@@ -75,7 +88,7 @@ export class LLMService {
 
     const data = await response.json();
     const yaml = data.choices[0]?.message?.content?.trim();
-    
+
     if (!yaml) {
       throw new Error('No YAML content received from OpenAI');
     }
@@ -98,7 +111,7 @@ export class LLMService {
         model: this.config.model || DEFAULT_MODELS.anthropic,
         max_tokens: 2000,
         temperature: 0.3,
-        system: 'You are a specialist in converting natural language descriptions into valid YAML infrastructure diagrams. Always respond with only valid YAML, no explanations or markdown formatting.',
+        system: YAML_SYSTEM_PROMPT,
         messages: [
           {
             role: 'user',
@@ -115,7 +128,7 @@ export class LLMService {
 
     const data = await response.json();
     const yaml = data.content[0]?.text?.trim();
-    
+
     if (!yaml) {
       throw new Error('No YAML content received from Anthropic');
     }
@@ -137,7 +150,7 @@ export class LLMService {
           {
             parts: [
               {
-                text: `You are a specialist in converting natural language descriptions into valid YAML infrastructure diagrams. Always respond with only valid YAML, no explanations or markdown formatting.\n\n${prompt}`
+                text: `${YAML_SYSTEM_PROMPT}\n\n${prompt}`
               }
             ]
           }
@@ -156,7 +169,7 @@ export class LLMService {
 
     const data = await response.json();
     const yaml = data.candidates[0]?.content?.parts[0]?.text?.trim();
-    
+
     if (!yaml) {
       throw new Error('No YAML content received from Gemini');
     }
@@ -164,6 +177,53 @@ export class LLMService {
     return {
       yaml,
       usage: data.usageMetadata
+    };
+  }
+
+  private async callCustom(prompt: string): Promise<LLMResponse> {
+    const baseUrl = this.config.baseUrl || '';
+    if (!baseUrl) {
+      throw new Error('Custom endpoint base URL is required');
+    }
+
+    const response = await fetch(getCustomEndpointUrl(baseUrl, 'chat/completions'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.config.apiKey ? { 'Authorization': `Bearer ${this.config.apiKey}` } : {})
+      },
+      body: JSON.stringify({
+        model: this.config.model || '',
+        messages: [
+          {
+            role: 'system',
+            content: YAML_SYSTEM_PROMPT
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.3,
+        ...(this.config.maxTokens ? { max_tokens: this.config.maxTokens } : {})
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Custom API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    const yaml = data.choices[0]?.message?.content?.trim();
+
+    if (!yaml) {
+      throw new Error('No YAML content received from custom endpoint');
+    }
+
+    return {
+      yaml,
+      usage: data.usage
     };
   }
 }
@@ -174,6 +234,10 @@ export const createLLMService = (): LLMService | null => {
   const openaiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY || localStorage?.getItem('openai_api_key');
   const anthropicKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY || localStorage?.getItem('anthropic_api_key');
   const geminiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || localStorage?.getItem('gemini_api_key');
+  const customKey = localStorage?.getItem('custom_api_key');
+  const customBaseUrl = localStorage?.getItem('custom_base_url');
+  const customModel = localStorage?.getItem('custom_model');
+  const customMaxTokens = localStorage?.getItem('custom_max_tokens');
 
   if (openaiKey) {
     return new LLMService({ provider: 'openai', apiKey: openaiKey });
@@ -181,6 +245,14 @@ export const createLLMService = (): LLMService | null => {
     return new LLMService({ provider: 'anthropic', apiKey: anthropicKey });
   } else if (geminiKey) {
     return new LLMService({ provider: 'gemini', apiKey: geminiKey });
+  } else if (customBaseUrl) {
+    return new LLMService({
+      provider: 'custom',
+      apiKey: customKey || '',
+      baseUrl: customBaseUrl,
+      model: customModel || undefined,
+      maxTokens: customMaxTokens && !Number.isNaN(parseInt(customMaxTokens, 10)) ? parseInt(customMaxTokens, 10) : undefined
+    });
   }
 
   return null;
@@ -189,18 +261,18 @@ export const createLLMService = (): LLMService | null => {
 // Gorph-specific prompt templates
 export const createGorphPrompt = (userDescription: string, conversationHistory: Array<{role: 'user' | 'assistant', content: string}> = []) => {
   const categoryList = [
-    'USER_FACING', 'FRONTEND', 'BACKEND', 'DATABASE', 'NETWORK', 
-    'INTEGRATION', 'INFRASTRUCTURE', 'INTERNAL', 'CI', 'REGISTRY', 
+    'USER_FACING', 'FRONTEND', 'BACKEND', 'DATABASE', 'NETWORK',
+    'INTEGRATION', 'INFRASTRUCTURE', 'INTERNAL', 'CI', 'REGISTRY',
     'CONFIG', 'CD', 'ENVIRONMENT', 'SCM'
   ];
 
   const connectionTypes = [
-    'HTTP_Request', 'API_Call', 'Internal_API', 'DB_Connection', 
-    'Service_Call', 'User_Interaction', 'Triggers_Build', 'Pushes_Image', 
+    'HTTP_Request', 'API_Call', 'Internal_API', 'DB_Connection',
+    'Service_Call', 'User_Interaction', 'Triggers_Build', 'Pushes_Image',
     'Updates_Config', 'Watches_Config', 'Deploys_To', 'Deploys', 'Hosts'
   ];
 
-  const historyContext = conversationHistory.length > 0 
+  const historyContext = conversationHistory.length > 0
     ? `\n\nPREVIOUS CONVERSATION:\n${conversationHistory.map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join('\n')}\n`
     : '';
 
@@ -220,7 +292,7 @@ ENTITIES (Required fields for each entity):
 
 CONNECTIONS (Required fields for each connection):
 - from: source entity id (must match an entity id exactly)
-- to: target entity id (must match an entity id exactly)  
+- to: target entity id (must match an entity id exactly)
 - type: MUST be one of: ${connectionTypes.join(', ')}
 
 CATEGORY MAPPING GUIDELINES:
@@ -263,7 +335,7 @@ ${historyContext}
 
 USER REQUEST: "${userDescription}"
 
-IMPORTANT: 
+IMPORTANT:
 1. Generate ONLY valid YAML (no explanations, no markdown formatting)
 2. Ensure all entity IDs are unique and properly referenced in connections
 3. Use appropriate categories and connection types from the lists above
@@ -273,4 +345,4 @@ IMPORTANT:
 YAML:`;
 };
 
-export default LLMService; 
+export default LLMService;
